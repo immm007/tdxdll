@@ -12,7 +12,7 @@ logging.basicConfig(filename="python.log", filemode='w', level=logging.DEBUG)
 用于成交明细分析的全局变量
 '''
 DETAIL_URL = 'http://quotes.money.163.com/cjmx/{0}/{1}/{2}.xls'
-DETAIL_FOLDER = 'E:\\chaoduan\\details'
+DETAIL_FOLDER = 'E:\\tdx extra data\\details'
 DETAIL_SESSION = requests.session()
 DETAIL_RESULT = {}
 
@@ -21,7 +21,7 @@ DETAIL_RESULT = {}
 '''
 FINANCIAL_URL = 'http://quotes.money.163.com/service/zycwzb_{0}.html?type=report'
 DAY_URL = 'http://quotes.money.163.com/service/chddata.html?code={0}&start=19901126&end={1}&fields=TCAP'
-FINANCIAL_FOLDER = 'E:\\chaoduan\\financial'
+FINANCIAL_FOLDER = 'E:\\tdx extra data\\financial'
 FINANCIAL_SESSION = requests.session()
 DAY_SESSION = requests.session()
 
