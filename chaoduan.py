@@ -7,7 +7,11 @@ import logging
 
 logging.basicConfig(filename="python.log", filemode='w', level=logging.DEBUG)
 
-
+ZQHY = [166,686,712,728,750,776,783,2500,2670,2673,
+        2736,2797,2926,2939,2945,300059,600030,600061,600109,600155,
+        600369,600621,600837,600864,600909,600958,600999,601066,601099,601108,
+        601162,601198,601211,601236,601375,601377,601555,601688,601788,601878,
+        601881,601901,601990]
 '''
 用于成交明细分析的全局变量
 '''
@@ -258,49 +262,82 @@ def get_lbcs(outs, code, dates, zt_types):
 def get_jzc(outs, code, dates):
     key = '股东权益不含少数股东权益(万元)'
     code = tr_code(code)
-    financial_url = make_financial_url(code)
-    global FINANCIAL_SESSION
-    if not FINANCIAL_SESSION.verify:
-        FINANCIAL_SESSION = requests.session()
-    with FINANCIAL_SESSION.get(financial_url) as response:
-        if response.status_code == 200:
-            path = os.path.join(FINANCIAL_FOLDER,'jzc.csv')
-            with open(path, 'wb') as tmp:
-                tmp.write(response.content)
-            df = pd.read_csv(path, index_col=0, encoding='gbk')
-            columns = df.columns[0:-1]
-            for i in range(len(dates)-1,-1,-1):
-                found = False
-                date = tr_date(dates[i])
-                for column in columns:
-                    if df[column][key]=='--':
-                        continue
-                    target = column.replace('-', '')
-                    if date >= target:
-                        outs[i] = float(df[column][key])
-                        found = True
-                        break
-                if not found:
-                    outs[i] = float(df[columns[-1]][key])
+    if code.startswith('88'):
+        return
+    name = str(datetime.date.today())+'_'+code+'_jzc.csv'
+    path = os.path.join(FINANCIAL_FOLDER,name)
+    if name not in os.listdir(FINANCIAL_FOLDER):
+        financial_url = make_financial_url(code)
+        global FINANCIAL_SESSION
+        if not FINANCIAL_SESSION.verify:
+            FINANCIAL_SESSION = requests.session()
+        with FINANCIAL_SESSION.get(financial_url) as response:
+            if response.status_code == 200:
+                with open(path, 'wb') as tmp:
+                    tmp.write(response.content)
+            else:
+                return
+    df = pd.read_csv(path, index_col=0, encoding='gbk')
+    columns = df.columns[0:-1]
+    for i in range(len(dates)-1,-1,-1):
+        found = False
+        date = tr_date(dates[i])
+        for column in columns:
+            if df[column][key]=='--':
+                continue
+            target = column.replace('-', '')
+            if date >= target:
+                outs[i] = float(df[column][key])
+                found = True
+                break
+        if not found:
+            outs[i] = float(df[columns[-1]][key])
 
 # 对应dll九号函数
 def get_sz(outs, code, dates, zfs):
     code = tr_code(code)
-    day_url = make_day_url(code)
-    global DAY_SESSION
-    if not DAY_SESSION.verify:
-        DAY_SESSION = requests.session()
-    with DAY_SESSION.get(day_url) as response:
-        if response.status_code == 200:
-            path = os.path.join(FINANCIAL_FOLDER, 'shizhi.csv')
-            with open(path, 'wb') as tmp:
-                tmp.write(response.content)
-            df = pd.read_csv(path, index_col=0, encoding='gbk')
-            for i in range(len(dates)):
-                date = tr_date(dates[i])
-                date = date[0:4]+'-'+date[4:6]+'-'+date[6:8]
-                zsz = df['总市值']
-                if date in zsz.index:
-                    outs[i] = zsz[date]
-                else:
-                    outs[i] = outs[i-1]+(zfs[i]/100.0)*outs[i-1]
+    if code.startswith('88'):
+        return
+    name = str(datetime.date.today())+'_'+code+'_shizhi.csv'
+    path = os.path.join(FINANCIAL_FOLDER, name)
+    if name not in os.listdir(FINANCIAL_FOLDER):
+        day_url = make_day_url(code)
+        global DAY_SESSION
+        if not DAY_SESSION.verify:
+            DAY_SESSION = requests.session()
+        with DAY_SESSION.get(day_url) as response:
+            if response.status_code == 200:
+                with open(path, 'wb') as tmp:
+                    tmp.write(response.content)
+            else:
+                return
+    df = pd.read_csv(path, index_col=0, encoding='gbk')
+    for i in range(len(dates)):
+        date = tr_date(dates[i])
+        date = date[0:4]+'-'+date[4:6]+'-'+date[6:8]
+        zsz = df['总市值']
+        if date < zsz.index[-1]:
+            outs[i] = np.NaN
+            continue
+        if date in zsz.index:
+            outs[i] = zsz[date]
+        else:
+            outs[i] = outs[i-1]+(zfs[i]/100.0)*outs[i-1]
+
+# 对应dll十号函数
+def get_avg_sjl(outs, code, dates):
+    code = tr_code(code)
+    if code == '880472':
+        nrow = len(ZQHY)
+        ncol = len(dates)
+        tmp_sz = np.zeros(ncol)
+        tmp_jzc = np.zeros(ncol)
+        ret = np.zeros([nrow,ncol])
+        for i in range(len(ZQHY)):
+            get_jzc(tmp_jzc, ZQHY[i], dates)
+            get_sz(tmp_sz, ZQHY[i], dates, None) #网易数据经常会跟新不及时，会造成bug
+            for j in range(ncol):
+                ret[i][j] = tmp_sz[j] / (10000.0*tmp_jzc[j])
+        avg_sjl = np.nanmean(ret,axis = 0)
+        for i in range(ncol):
+            outs[i] = avg_sjl[i]
