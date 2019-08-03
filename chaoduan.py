@@ -28,7 +28,7 @@ DAY_URL = 'http://quotes.money.163.com/service/chddata.html?code={0}&start=19901
 FINANCIAL_FOLDER = 'E:\\tdx extra data\\financial'
 FINANCIAL_SESSION = requests.session()
 DAY_SESSION = requests.session()
-
+MEDIAN = None
 '''
 转化通达信日期为字符串
 '''
@@ -338,6 +338,19 @@ def get_avg_sjl(outs, code, dates):
             get_sz(tmp_sz, ZQHY[i], dates, None) #网易数据经常会跟新不及时，会造成bug
             for j in range(ncol):
                 ret[i][j] = tmp_sz[j] / (10000.0*tmp_jzc[j])
-        avg_sjl = np.nanmean(ret,axis = 0)
+        mean_sjl = np.nanmean(ret,axis = 0)
+        global MEDIAN
+        MEDIAN = np.nanmedian(ret, axis=0)
         for i in range(ncol):
-            outs[i] = avg_sjl[i]
+            outs[i] = mean_sjl[i]
+        #return ret
+
+# 对应11号函数
+def get_median_sjl(outs, code, dates):
+    code = tr_code(code)
+    if code=='880472':
+        for i in range(len(dates)):
+            outs[i] = MEDIAN[i]
+            
+#outs = [0]
+#ret = get_avg_sjl(outs,880472,[20150505-19000000])
